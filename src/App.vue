@@ -70,17 +70,23 @@
       </li>
     </ul>
 
-    <div class="auth-row">
+    <div class="auth-row" v-if="!beverageStore.user">
       <button @click="withGoogle">Sign in with Google</button>
     </div>
+    <div class="auth-row" v-else>
+      <span class="user" >Signed in as {{ beverageStore.user.email }}</span>
+      <button class="signout-btn" @click="signOutUser">Sign Out</button>
+    </div>
+    <div v-if="beverageStore.user">
     <input
       v-model="beverageStore.currentName"
       type="text"
       placeholder="Beverage Name"
     />
-
+    </div>
+    <div class="makeBeverage_button" v-if="beverageStore.user">
     <button @click="handleMakeBeverage">🍺 Make Beverage</button>
-
+    </div>
     <p v-if="message" class="status-message">
       {{ message }}
     </p>
@@ -104,6 +110,7 @@
 import { ref } from "vue";
 import Beverage from "./components/Beverage.vue";
 import { useBeverageStore } from "./stores/beverageStore";
+import { beforeAuthStateChanged, getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth"
 
 const beverageStore = useBeverageStore();
 beverageStore.init();
@@ -116,12 +123,32 @@ const showMessage = (txt: string) => {
     message.value = "";
   }, 5000);
 };
+const auth = getAuth();
 
-const withGoogle = async () => {};
+const withGoogle = async () => {
+  const provider = new GoogleAuthProvider();
+  try {
+    const result = await signInWithPopup(auth, provider);
+    beverageStore.setUser(result.user)
+  }
+  catch (err) {
+    console.error("Error signing in: ", err);
+  }
+};
 
-const handleMakeBeverage = () => {
-  const txt = beverageStore.makeBeverage();
-  showMessage(txt);
+const signOutUser = async() => {
+  try {
+  await signOut(auth);
+  beverageStore.setUser(null);
+} catch (err) {
+  console.error("Error signing out: ", err);
+}
+};
+
+
+const handleMakeBeverage = async () => {
+  const txt = await beverageStore.makeBeverage();
+  if (txt) showMessage(txt);
 };
 </script>
 
@@ -141,12 +168,17 @@ ul {
   list-style: none;
 }
 
+.makeBeverage_button {
+  margin-top: 8px;
+}
 .auth-row {
-  margin-top: 10px;
+  margin-right: 10px;
   margin-bottom: 8px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
+  background: white;
+  border-radius: 6px;
 }
 
 .user-label {
