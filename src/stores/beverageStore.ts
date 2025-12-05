@@ -145,7 +145,75 @@ export const useBeverageStore = defineStore("BeverageStore", {
         this.currentSyrup
       );
     },
-    makeBeverage() {},
-    setUser(user: User | null) {},
+// -------------------------------------------------------
+    makeBeverage(): Promise<string> {
+      if (!this.user) {
+        return Promise.resolve("Sign in first");
+      }
+
+      const bevID = this.currentName || crypto.randomUUID();
+
+      const ref = doc(db, "users", this.user.uid, "beverages", bevID);
+
+      const payload = {
+        name: this.currentName || "New Beverage",
+        temp: this.currentTemp,
+        baseID: this.currentBase?.id || null,
+        syrupID: this.currentSyrup?.id || null,
+        creamerID: this.currentCreamer?.id || null,
+      };
+
+      return setDoc(ref, payload, {merge: true})
+      .then(() => {
+        console.log("Saved Beverage: ", payload);
+        return "Beverage Saved!";
+      })
+    },
+
+    setUser(user: User | null) {
+      if (this.snapshotUnsubscribe) {
+        this.snapshotUnsubscribe();
+        this.snapshotUnsubscribe = null;
+      }
+
+      this.user = user;
+
+      if (!user) {
+        this.beverages = [];
+        this.currentBeverage = null;
+        return;
+      }
+
+      const beverageCol = collection(db, "users", user.uid, "beverages")
+
+      this.snapshotUnsubscribe = onSnapshot(
+        beverageCol,
+        (snapshot) => {
+          const list: BeverageType[] = snapshot.docs.map((d) => {
+            const data = d.data();
+            return {
+              id: d.id,
+              name: data.name,
+              temp: this.temps.find((t) => t === data.temp)!,
+              base: this.bases.find((b) => b.id === data.baseID)!,
+              syrup: this.syrups.find((s) => s.id === data.syrupID)!,
+              creamer: this.creamers.find((c) => c.id === data.creamerID)!,
+            } as BeverageType;
+          });
+
+        this.beverages = list;
+
+        if (list.length > 0) {
+          const exists = 
+          this.currentBeverage && list.some((b) => b.id === this.currentBeverage!.id);
+
+          this.currentBeverage = 
+          exists ? list.find((b) => b.id === this.currentBeverage!.id)! : list[0];
+        } else {
+          this.currentBase = null;
+        }
+        }
+      );
+    },
   },
 });
